@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数字拼图游戏</title>
+    <style>
+        body {
+            font-family: 'Comic Sans MS', 'Chalkboard SE', 'Marker Felt', sans-serif;
+            background-color: #f9f3e5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+        
+        .container {
+            text-align: center;
+        }
+        
+        h1 {
+            color: #ff6b6b;
+            text-shadow: 2px 2px 0 #ffcc5c;
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+        }
+        
+        .game-info {
+            margin-bottom: 20px;
+            font-size: 1.2rem;
+            color: #555;
+        }
+        
+        .timer {
+            font-weight: bold;
+            color: #ff6b6b;
+        }
+        
+        .puzzle {
+            display: grid;
+            grid-template-columns: repeat(3, 100px);
+            grid-template-rows: repeat(3, 100px);
+            gap: 10px;
+            margin-bottom: 20px;
+            position: relative;
+        }
+        
+        .tile {
+            width: 100px;
+            height: 100px;
+            background: linear-gradient(135deg, #ffcc5c, #ff6b6b);
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: white;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            transition: all 0.2s ease;
+            position: absolute;
+            overflow: hidden;
+        }
+        
+        .tile:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+        }
+        
+        .tile::before {
+            content: '';
+            position: absolute;
+            top: -10px;
+            left: -10px;
+            width: 40px;
+            height: 40px;
+            background-color: rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+        }
+        
+        .tile::after {
+            content: '';
+            position: absolute;
+            bottom: -5px;
+            right: -5px;
+            width: 20px;
+            height: 20px;
+            background-color: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+        }
+        
+        .empty {
+            background: #f9f3e5;
+            box-shadow: inset 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        .empty::before, .empty::after {
+            display: none;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #ffcc5c, #ff6b6b);
+            border: none;
+            border-radius: 30px;
+            padding: 12px 30px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: white;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            transition: transform 0.2s, box-shadow 0.2s;
+            font-family: inherit;
+        }
+        
+        .btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+        }
+        
+        .btn:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+        
+        .modal-content {
+            background-color: white;
+            padding: 30px;
+            border-radius: 20px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            max-width: 400px;
+            width: 80%;
+            position: relative;
+            animation: pop 0.5s;
+        }
+        
+        @keyframes pop {
+            0% { transform: scale(0.8); opacity: 0; }
+            70% { transform: scale(1.1); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        
+        .modal h2 {
+            color: #ff6b6b;
+            margin-top: 0;
+        }
+        
+        .confetti {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: #ffcc5c;
+            opacity: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>数字拼图游戏</h1>
+        <div class="game-info">
+            时间: <span class="timer">00:00</span>
+        </div>
+        <div class="puzzle" id="puzzle"></div>
+        <button class="btn" id="restart-btn">重新开始</button>
+    </div>
+    
+    <div class="modal" id="win-modal">
+        <div class="modal-content">
+            <h2>恭喜你！</h2>
+            <p>你完成了拼图！</p>
+            <p>用时: <span id="final-time">00:00</span></p>
+            <button class="btn" id="play-again-btn">再玩一次</button>
+        </div>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const puzzle = document.getElementById('puzzle');
+            const timer = document.querySelector('.timer');
+            const restartBtn = document.getElementById('restart-btn');
+            const winModal = document.getElementById('win-modal');
+            const finalTime = document.getElementById('final-time');
+            const playAgainBtn = document.getElementById('play-again-btn');
+            
+            let tiles = [];
+            let emptyPos = { row: 2, col: 2 };
+            let startTime;
+            let timerInterval;
+            let isGameStarted = false;
+            
+            // 初始化拼图
+            function initPuzzle() {
+                puzzle.innerHTML = '';
+                tiles = [];
+                
+                // 设置拼图容器的尺寸
+                puzzle.style.width = '320px';
+                puzzle.style.height = '320px';
+                
+                // 创建有序的拼图
+                for (let i = 0; i < 3; i++) {
+                    for (let j = 0; j < 3; j++) {
+                        const index = i * 3 + j;
+                        if (index < 8) {
+                            const tile = document.createElement('div');
+                            tile.className = 'tile';
+                            tile.textContent = index + 1;
+                            tile.dataset.row = i;
+                            tile.dataset.col = j;
+                            tile.style.top = (i * 110) + 'px';
+                            tile.style.left = (j * 110) + 'px';
+                            
+                            // 使用闭包保存当前的行和列值
+                            tile.addEventListener('click', function() {
+                                const currentRow = parseInt(this.dataset.row);
+                                const currentCol = parseInt(this.dataset.col);
+                                moveTile(currentRow, currentCol);
+                            });
+                            
+                            puzzle.appendChild(tile);
+                            tiles.push(tile);
+                        } else {
+                            // 空白格
+                            const emptyTile = document.createElement('div');
+                            emptyTile.className = 'tile empty';
+                            emptyTile.dataset.row = i;
+                            emptyTile.dataset.col = j;
+                            emptyTile.style.top = (i * 110) + 'px';
+                            emptyTile.style.left = (j * 110) + 'px';
+                            puzzle.appendChild(emptyTile);
+                            emptyPos = { row: i, col: j };
+                        }
+                    }
+                }
+                
+                // 打乱拼图
+                shufflePuzzle();
+                
+                // 重置计时器
+                clearInterval(timerInterval);
+                timer.textContent = '00:00';
+                isGameStarted = false;
+            }
+            
+            // 打乱拼图
+            function shufflePuzzle() {
+                // 随机移动空白格100次
+                for (let i = 0; i < 100; i++) {
+                    const possibleMoves = [];
+                    
+                    // 上
+                    if (emptyPos.row > 0) {
+                        possibleMoves.push({ row: emptyPos.row - 1, col: emptyPos.col });
+                    }
+                    // 下
+                    if (emptyPos.row < 2) {
+                        possibleMoves.push({ row: emptyPos.row + 1, col: emptyPos.col });
+                    }
+                    // 左
+                    if (emptyPos.col > 0) {
+                        possibleMoves.push({ row: emptyPos.row, col: emptyPos.col - 1 });
+                    }
+                    // 右
+                    if (emptyPos.col < 2) {
+                        possibleMoves.push({ row: emptyPos.row, col: emptyPos.col + 1 });
+                    }
+                    
+                    // 随机选择一个可能的移动
+                    const randomMove = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
+                    
+                    // 交换位置
+                    swapTiles(randomMove.row, randomMove.col);
+                }
+            }
+            
+            // 移动拼图
+            function moveTile(row, col) {
+                // 检查是否可以移动
+                if (
+                    (Math.abs(row - emptyPos.row) === 1 && col === emptyPos.col) ||
+                    (Math.abs(col - emptyPos.col) === 1 && row === emptyPos.row)
+                ) {
+                    // 如果游戏还没开始，开始计时
+                    if (!isGameStarted) {
+                        startTimer();
+                        isGameStarted = true;
+                    }
+                    
+                    // 交换位置
+                    swapTiles(row, col);
+                    
+                    // 检查是否完成
+                    checkWin();
+                }
+            }
+            
+            // 交换拼图
+            function swapTiles(row, col) {
+                // 找到要移动的拼图
+                const tileToMove = document.querySelector(`.tile[data-row="${row}"][data-col="${col}"]`);
+                const emptyTile = document.querySelector(`.tile[data-row="${emptyPos.row}"][data-col="${emptyPos.col}"]`);
+                
+                if (!tileToMove || !emptyTile) {
+                    console.error("找不到要交换的拼图块");
+                    return;
+                }
+                
+                // 交换数据属性
+                const tempRow = tileToMove.dataset.row;
+                const tempCol = tileToMove.dataset.col;
+                
+                tileToMove.dataset.row = emptyTile.dataset.row;
+                tileToMove.dataset.col = emptyTile.dataset.col;
+                
+                emptyTile.dataset.row = tempRow;
+                emptyTile.dataset.col = tempCol;
+                
+                // 更新位置
+                updateTilePositions();
+                
+                // 更新空白格位置
+                emptyPos = { row, col };
+            }
+            
+            // 更新所有拼图块的位置
+            function updateTilePositions() {
+                const allTiles = document.querySelectorAll('.tile');
+                allTiles.forEach(tile => {
+                    const row = parseInt(tile.dataset.row);
+                    const col = parseInt(tile.dataset.col);
+                    tile.style.top = (row * 110) + 'px';  // 100px高度 + 10px间隔
+                    tile.style.left = (col * 110) + 'px'; // 100px宽度 + 10px间隔
+                });
+            }
+            
+            // 检查是否完成
+            function checkWin() {
+                let isWin = true;
+                
+                // 检查每个拼图是否在正确位置
+                for (let i = 0; i < tiles.length; i++) {
+                    const tile = tiles[i];
+                    const correctRow = Math.floor(i / 3);
+                    const correctCol = i % 3;
+                    
+                    if (parseInt(tile.dataset.row) !== correctRow || parseInt(tile.dataset.col) !== correctCol) {
+                        isWin = false;
+                        break;
+                    }
+                }
+                
+                // 检查空白格是否在右下角
+                if (emptyPos.row !== 2 || emptyPos.col !== 2) {
+                    isWin = false;
+                }
+                
+                if (isWin) {
+                    clearInterval(timerInterval);
+                    finalTime.textContent = timer.textContent;
+                    winModal.style.display = 'flex';
+                    createConfetti();
+                }
+            }
+            
+            // 开始计时
+            function startTimer() {
+                startTime = new Date();
+                timerInterval = setInterval(updateTimer, 1000);
+            }
+            
+            // 更新计时器
+            function updateTimer() {
+                const currentTime = new Date();
+                const elapsedTime = Math.floor((currentTime - startTime) / 1000);
+                const minutes = Math.floor(elapsedTime / 60).toString().padStart(2, '0');
+                const seconds = (elapsedTime % 60).toString().padStart(2, '0');
+                timer.textContent = `${minutes}:${seconds}`;
+            }
+            
+            // 创建庆祝效果
+            function createConfetti() {
+                const colors = ['#ffcc5c', '#ff6b6b', '#88d8b0', '#6bb5ff', '#f6a6ff'];
+                
+                for (let i = 0; i < 50; i++) {
+                    const confetti = document.createElement('div');
+                    confetti.className = 'confetti';
+                    confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                    confetti.style.left = Math.random() * 100 + '%';
+                    confetti.style.top = -20 + 'px';
+                    confetti.style.width = Math.random() * 10 + 5 + 'px';
+                    confetti.style.height = Math.random() * 10 + 5 + 'px';
+                    confetti.style.opacity = 1;
+                    confetti.style.transform = 'rotate(' + Math.random() * 360 + 'deg)';
+                    
+                    document.body.appendChild(confetti);
+                    
+                    const animationDuration = Math.random() * 3 + 2;
+                    
+                    confetti.animate([
+                        { transform: 'translateY(0) rotate(0)', opacity: 1 },
+                        { transform: `translateY(${window.innerHeight}px) rotate(${Math.random() * 360}deg)`, opacity: 0 }
+                    ], {
+                        duration: animationDuration * 1000,
+                        easing: 'cubic-bezier(0.215, 0.61, 0.355, 1)'
+                    }).onfinish = function() {
+                        confetti.remove();
+                    };
+                }
+            }
+            
+            // 重新开始游戏
+            function restartGame() {
+                winModal.style.display = 'none';
+                initPuzzle();
+            }
+            
+            // 事件监听
+            restartBtn.addEventListener('click', restartGame);
+            playAgainBtn.addEventListener('click', restartGame);
+            
+            // 初始化游戏
+            initPuzzle();
+        });
+    </script>
+</body>
+</html>
